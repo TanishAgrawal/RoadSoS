@@ -4,6 +4,7 @@ export default function SearchFallback({ onLocationFound }) {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [resolvedPlace, setResolvedPlace] = useState(null)
 
   const handleSubmit = async (event) => {
     event.preventDefault()
@@ -15,7 +16,7 @@ export default function SearchFallback({ onLocationFound }) {
 
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(trimmedQuery)}&format=json&limit=1`,
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(trimmedQuery)}&format=json&addressdetails=1&limit=1`,
         {
           headers: {
             Accept: 'application/json',
@@ -34,7 +35,15 @@ export default function SearchFallback({ onLocationFound }) {
         throw new Error('No matching location found.')
       }
 
-      onLocationFound(Number(firstResult.lat), Number(firstResult.lon))
+      const resolvedLocation = {
+        lat: Number(firstResult.lat),
+        lng: Number(firstResult.lon),
+        placeName: firstResult.display_name || trimmedQuery,
+        countryCode: firstResult.address?.country_code || null,
+      }
+
+      setResolvedPlace(resolvedLocation.placeName)
+      onLocationFound(resolvedLocation)
     } catch (submissionError) {
       setError(submissionError.message || 'Unable to find that location.')
     } finally {
@@ -69,6 +78,11 @@ export default function SearchFallback({ onLocationFound }) {
         </div>
 
         {error ? <p className="mt-4 text-sm font-medium text-red-600">{error}</p> : null}
+        {resolvedPlace ? (
+          <p className="mt-3 text-sm font-semibold text-emerald-700">
+            Resolved location: {resolvedPlace}
+          </p>
+        ) : null}
       </form>
     </div>
   )

@@ -19,6 +19,20 @@ function addDistances(services, lat, lng) {
 		.sort((left, right) => left.distance - right.distance)
 }
 
+function dedupeServices(services) {
+	const seen = new Set()
+	return services.filter((service) => {
+		const key = `${service.type}-${service.id}`
+		if (seen.has(key)) return false
+		seen.add(key)
+		return true
+	})
+}
+
+function mergeServices(cachedServices, liveServices) {
+	return dedupeServices([...(cachedServices || []), ...(liveServices || [])])
+}
+
 async function fetchAllServices(lat, lng) {
 	const results = await Promise.all([
 		fetchHospitals(lat, lng),
@@ -34,9 +48,8 @@ async function fetchAllServices(lat, lng) {
 
 export default function useNearbyServices({ lat, lng } = {}) {
 	const [services, setServices] = useState([])
-	const [loading, setLoading] = useState(typeof lat === 'number' && typeof lng === 'number')
+	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState(null)
-	const [source, setSource] = useState('live')
 
 	useEffect(() => {
 		let cancelled = false
@@ -45,36 +58,33 @@ export default function useNearbyServices({ lat, lng } = {}) {
 			return undefined
 		}
 
-		const cachedServices = loadServices()
+		const cachedServices = loadServices(lat, lng)
 
 		void (async () => {
 			if (cachedServices?.length) {
-				setServices(cachedServices)
-				setLoading(false)
-				setSource('cached')
+				setServices(addDistances(cachedServices, lat, lng))
 			} else {
-				setLoading(true)
-				setSource('live')
+				setServices([])
 			}
 
 			setError(null)
+			setLoading(true)
 
 			try {
 				const fetchedServices = await fetchAllServices(lat, lng)
 				if (cancelled) return
 
-				const enrichedServices = addDistances(fetchedServices, lat, lng)
+				const mergedServices = mergeServices(cachedServices, fetchedServices)
+				const enrichedServices = addDistances(mergedServices, lat, lng)
 				setServices(enrichedServices)
-				setLoading(false)
-				setSource('live')
-				saveServices(enrichedServices)
-			} catch {
+				saveServices(enrichedServices, { lat, lng })
+			} catch (err) {
 				if (cancelled) return
-
-				if (!cachedServices?.length) {
-					setError('Unable to load nearby services.')
-					setLoading(false)
-				}
+				setError('Unable to load nearby services from Overpass.')
+				// log for debugging
+				console.warn('[useNearbyServices] fetch failed', err)
+			} finally {
+				if (!cancelled) setLoading(false)
 			}
 		})()
 
@@ -83,5 +93,5 @@ export default function useNearbyServices({ lat, lng } = {}) {
 		}
 	}, [lat, lng])
 
-	return { services, loading, error, source }
+	return { services, loading, error }
 }

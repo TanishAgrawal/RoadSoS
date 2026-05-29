@@ -1,8 +1,24 @@
 import { useEffect, useState } from 'react'
 
-async function reverseGeocodeCountry(lat, lng, signal) {
+function pickDetectedPlaceName(address = {}) {
+	return (
+		address.locality ||
+		address.neighbourhood ||
+		address.suburb ||
+		address.city_district ||
+		address.district ||
+		address.town ||
+		address.village ||
+		address.city ||
+		address.municipality ||
+		address.county ||
+		null
+	)
+}
+
+async function reverseGeocodeLocation(lat, lng, signal) {
 	const response = await fetch(
-		`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+		`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
 		{
 			signal,
 			headers: {
@@ -14,13 +30,14 @@ async function reverseGeocodeCountry(lat, lng, signal) {
 	if (!response.ok) return null
 
 	const payload = await response.json()
-	return payload?.address?.country_code ?? null
+	return payload
 }
 
 export default function useGeolocation() {
 	const [lat, setLat] = useState(null)
 	const [lng, setLng] = useState(null)
 	const [countryCode, setCountryCode] = useState(null)
+	const [placeName, setPlaceName] = useState(null)
 	const supportsGeolocation = typeof navigator !== 'undefined' && Boolean(navigator.geolocation)
 	const [error, setError] = useState(
 		supportsGeolocation ? null : 'Geolocation is not supported by this browser.'
@@ -46,9 +63,18 @@ export default function useGeolocation() {
 				setLng(nextLng)
 
 				try {
-					const detectedCountryCode = await reverseGeocodeCountry(nextLat, nextLng, controller.signal)
-					if (!cancelled && detectedCountryCode) {
-						setCountryCode(detectedCountryCode)
+					const detectedLocation = await reverseGeocodeLocation(nextLat, nextLng, controller.signal)
+					if (!cancelled && detectedLocation) {
+						const detectedCountryCode = detectedLocation.address?.country_code ?? null
+						const detectedPlaceName = pickDetectedPlaceName(detectedLocation.address)
+
+						if (detectedCountryCode) {
+							setCountryCode(detectedCountryCode)
+						}
+
+						if (detectedPlaceName) {
+							setPlaceName(detectedPlaceName)
+						}
 					}
 				} catch {
 					// Country lookup is best-effort; keep location usable if it fails.
@@ -75,5 +101,5 @@ export default function useGeolocation() {
 		}
 	}, [supportsGeolocation])
 
-	return { lat, lng, countryCode, error, loading }
+	return { lat, lng, countryCode, placeName, error, loading }
 }
