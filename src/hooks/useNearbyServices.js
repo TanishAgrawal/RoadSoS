@@ -46,7 +46,7 @@ async function fetchAllServices(lat, lng) {
 	return results.flat()
 }
 
-export default function useNearbyServices({ lat, lng } = {}) {
+export default function useNearbyServices({ lat, lng, reloadToken } = {}) {
 	const [services, setServices] = useState([])
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState(null)
@@ -91,7 +91,7 @@ export default function useNearbyServices({ lat, lng } = {}) {
 		return () => {
 			cancelled = true
 		}
-	}, [lat, lng])
+	}, [lat, lng, reloadToken])
 
 	return { services, loading, error }
 }

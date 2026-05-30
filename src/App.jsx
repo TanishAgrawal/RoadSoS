@@ -3,6 +3,7 @@ import Map from './components/Map.jsx'
 import LoadingSpinner from './components/LoadingSpinner.jsx'
 import SearchFallback from './components/SearchFallback.jsx'
 import SOSButton from './components/SOSButton.jsx'
+import ErrorLanding from './components/ErrorLanding.jsx'
 import useGeolocation from './hooks/useGeolocation.js'
 import useNearbyServices from './hooks/useNearbyServices.js'
 import { saveLocation } from './services/offlineCache.js'
@@ -17,8 +18,10 @@ const CATEGORY_META = [
 ]
 
 function App() {
-  const { lat, lng, countryCode, placeName, error, loading } = useGeolocation()
+  const { lat, lng, countryCode, placeName, error, loading, refresh } = useGeolocation()
   const [manualLocation, setManualLocation] = useState(null)
+  const [showSearch, setShowSearch] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
   const [activeView, setActiveView] = useState('home')
   const [activeCategory, setActiveCategory] = useState('hospital')
   const [focusedServiceId, setFocusedServiceId] = useState(null)
@@ -28,9 +31,10 @@ function App() {
   const resolvedCountryCode = manualLocation?.countryCode ?? countryCode
   const resolvedPlaceName = manualLocation?.placeName ?? placeName ?? null
 
-  const { services } = useNearbyServices({
+  const { services, loading: servicesLoading, error: servicesError } = useNearbyServices({
     lat: resolvedLat,
     lng: resolvedLng,
+    reloadToken,
   })
 
   useEffect(() => {
@@ -39,12 +43,32 @@ function App() {
     }
   }, [resolvedLat, resolvedLng])
 
-  if (loading && !manualLocation) {
-    return <LoadingSpinner />
-  }
-
+  // Full-page error landing when geolocation or Overpass/service fetch fails
+  // If geolocation failed (user denied or unavailable), allow manual search instead of showing an error.
   if (error && !manualLocation) {
     return <SearchFallback onLocationFound={(location) => setManualLocation(location)} />
+  }
+
+  // If Overpass / services fetch failed, show the full-page error landing with emergency number and retry.
+  if (servicesError) {
+    return (
+      <ErrorLanding
+        message={typeof servicesError === 'string' ? servicesError : 'Unable to load nearby services.'}
+        countryCode={resolvedCountryCode}
+        onRetry={() => setReloadToken((t) => t + 1)}
+      />
+    )
+  }
+
+  // Show search fallback when user explicitly requests manual search
+  if (showSearch) {
+    return <SearchFallback onLocationFound={(location) => { setManualLocation(location); setShowSearch(false); }} />
+  }
+
+  const waitingForData = (typeof resolvedLat === 'number' && typeof resolvedLng === 'number') && (loading || servicesLoading)
+
+  if (waitingForData) {
+    return <LoadingSpinner />
   }
 
   if (typeof resolvedLat !== 'number' || typeof resolvedLng !== 'number') {
@@ -73,6 +97,11 @@ function App() {
           setActiveView('home')
           setFocusedServiceId(null)
         }}
+        onChangeLocation={() => {
+          // allow the user to pick a new location manually
+          setManualLocation(null)
+          setShowSearch(true)
+        }}
       />
     )
   }
@@ -92,6 +121,15 @@ function App() {
           <p className="mt-2 text-base font-semibold text-slate-900">
             {resolvedPlaceName || `${resolvedLat.toFixed(4)}, ${resolvedLng.toFixed(4)}`}
           </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowSearch(true)}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md active:translate-y-0"
+            >
+              Change Location
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 flex w-full justify-center">
@@ -99,6 +137,7 @@ function App() {
             countryCode={resolvedCountryCode}
             services={services}
             onOpenDirections={(service) => openCategoryMap(service.type, `${service.type}-${service.id}`)}
+            onOpenAllOptions={(category) => openCategoryMap(category)}
           />
         </div>
 
@@ -110,7 +149,7 @@ function App() {
                 key={category.type}
                 type="button"
                 onClick={() => openCategoryMap(category.type)}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
+                className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-4 py-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:shadow-md"
               >
                 <div className="text-2xl">{category.emoji}</div>
                 <div className="mt-2 text-sm font-semibold text-slate-700">{category.label}</div>

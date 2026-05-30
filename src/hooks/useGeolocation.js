@@ -43,6 +43,7 @@ export default function useGeolocation() {
 		supportsGeolocation ? null : 'Geolocation is not supported by this browser.'
 	)
 	const [loading, setLoading] = useState(supportsGeolocation)
+	const [refreshIndex, setRefreshIndex] = useState(0)
 
 	useEffect(() => {
 		let cancelled = false
@@ -99,7 +100,13 @@ export default function useGeolocation() {
 			cancelled = true
 			controller.abort()
 		}
-	}, [supportsGeolocation])
+	}, [supportsGeolocation, refreshIndex])
 
-	return { lat, lng, countryCode, placeName, error, loading }
+	// Expose a refresh function to re-request the location (used by UI retry)
+	function refresh() {
+		setLoading(true)
+		setRefreshIndex((i) => i + 1)
+	}
+
+	return { lat, lng, countryCode, placeName, error, loading, refresh }
 }

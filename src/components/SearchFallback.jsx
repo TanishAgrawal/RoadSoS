@@ -52,7 +52,7 @@ export default function SearchFallback({ onLocationFound }) {
   }
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-4 py-10">
+    <div className="flex min-h-screen w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.14),_transparent_45%),linear-gradient(180deg,_#f8fafc_0%,_#eef2ff_100%)] px-4 py-10">
       <form onSubmit={handleSubmit} className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl shadow-slate-200/70">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-600">Location needed</p>
         <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">Enter your city or area</h2>
@@ -71,7 +71,7 @@ export default function SearchFallback({ onLocationFound }) {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-2xl bg-slate-900 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-2xl bg-slate-900 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Searching...' : 'Find services'}
           </button>

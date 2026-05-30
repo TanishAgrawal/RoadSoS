@@ -6,6 +6,10 @@ function formatDistance(distance) {
   return `${distance.toFixed(1)} km away`
 }
 
+function buildGoogleMapsDirectionsUrl(service) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${service.lat},${service.lng}&travelmode=driving`
+}
+
 function pickNearest(services, type) {
   const byType = services.filter((service) => service.type === type)
   if (!byType.length) return null
@@ -14,7 +18,7 @@ function pickNearest(services, type) {
   )
 }
 
-export default function SOSButton({ countryCode, services = [], onOpenDirections }) {
+export default function SOSButton({ countryCode, services = [], onOpenDirections, onOpenAllOptions }) {
   const [isOpen, setIsOpen] = useState(false)
 
   const emergencyNumber = useMemo(() => getEmergencyNumber(countryCode), [countryCode])
@@ -33,7 +37,7 @@ export default function SOSButton({ countryCode, services = [], onOpenDirections
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="z-[20] flex h-40 w-40 items-center justify-center rounded-full bg-red-600 text-4xl font-black tracking-wide text-white shadow-[0_24px_50px_rgba(220,38,38,0.45)] transition hover:scale-105 hover:bg-red-500 active:scale-95"
+        className="z-[20] flex h-40 w-40 cursor-pointer items-center justify-center rounded-full bg-red-600 text-4xl font-black tracking-wide text-white shadow-[0_24px_50px_rgba(220,38,38,0.45)] transition hover:scale-105 hover:bg-red-500 active:scale-95"
       >
         SOS
       </button>
@@ -49,7 +53,7 @@ export default function SOSButton({ countryCode, services = [], onOpenDirections
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="cursor-pointer rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Close
               </button>
@@ -75,21 +79,31 @@ export default function SOSButton({ countryCode, services = [], onOpenDirections
                     <div className="mt-4 flex flex-wrap gap-2">
                       <a
                         href={`tel:${callNumber}`}
-                        className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                        className="cursor-pointer rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
                       >
                         📞 Call
                       </a>
                       {option.service ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsOpen(false)
-                            onOpenDirections(option.service)
-                          }}
-                          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
-                        >
-                          🗺 Directions
-                        </button>
+                        <>
+                          <a
+                            href={buildGoogleMapsDirectionsUrl(option.service)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="cursor-pointer rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-blue-500 hover:shadow-lg active:translate-y-0"
+                          >
+                            🗺 Directions
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsOpen(false)
+                              onOpenAllOptions?.(option.key)
+                            }}
+                            className="cursor-pointer rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition hover:-translate-y-0.5 hover:bg-blue-100 hover:shadow-sm active:translate-y-0"
+                          >
+                            View all options
+                          </button>
+                        </>
                       ) : null}
                     </div>
                   </article>
@@ -106,7 +120,7 @@ export default function SOSButton({ countryCode, services = [], onOpenDirections
                 <div className="mt-4">
                   <a
                     href={`tel:${emergencyNumber}`}
-                    className="rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
+                    className="cursor-pointer rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500"
                   >
                     📞 Call Emergency Number
                   </a>
