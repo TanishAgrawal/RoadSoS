@@ -15,7 +15,7 @@ export default function SearchFallback({ onLocationFound, onUseGPS }) {
     setError(null)
 
     try {
-      const searchUrl = `/nominatim/search?q=${encodeURIComponent(trimmedQuery)}&format=json&addressdetails=1&limit=1`
+      const searchUrl = `/api/nominatim/search?q=${encodeURIComponent(trimmedQuery)}&format=json&addressdetails=1&limit=1`
       const response = await fetch(
         searchUrl,
         {
