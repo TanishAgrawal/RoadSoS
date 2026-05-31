@@ -3,7 +3,7 @@ import { getDistanceKm } from '../utils/haversine.js'
 const SERVICES_KEY = 'roadsos_cache'
 const LOCATION_KEY = 'roadsos_last_location'
 const CACHE_TTL_MS = 4 * 60 * 60 * 1000
-const CACHE_LOAD_RADIUS_KM = 50
+const CACHE_LOAD_RADIUS_KM = 100
 const CACHE_PRUNE_RADIUS_KM = 100
 
 function now() {
@@ -70,6 +70,37 @@ export function loadServices(lat, lng) {
 	if (distanceFromOrigin > CACHE_LOAD_RADIUS_KM) return null
 
 	return Array.isArray(parsedValue.data) ? parsedValue.data : null
+}
+
+export function isCacheClose(lat, lng, thresholdKm = 1) {
+	if (typeof localStorage === 'undefined') return false
+	if (typeof lat !== 'number' || typeof lng !== 'number') return false
+
+	const rawValue = localStorage.getItem(SERVICES_KEY)
+	if (!rawValue) return false
+
+	const parsedValue = safeJsonParse(rawValue)
+	if (!parsedValue || typeof parsedValue.timestamp !== 'number') {
+		clearServicesCache()
+		return false
+	}
+
+	if (now() - parsedValue.timestamp > CACHE_TTL_MS) {
+		clearServicesCache()
+		return false
+	}
+
+	const cacheOrigin = isValidOrigin(parsedValue.origin) ? parsedValue.origin : loadLocation()
+	if (!isValidOrigin(cacheOrigin)) return false
+
+	const distanceFromOrigin = getDistanceKm(lat, lng, cacheOrigin.lat, cacheOrigin.lng)
+
+	if (distanceFromOrigin > CACHE_PRUNE_RADIUS_KM) {
+		clearServicesCache()
+		return false
+	}
+
+	return distanceFromOrigin <= thresholdKm
 }
 
 export function saveLocation(lat, lng) {

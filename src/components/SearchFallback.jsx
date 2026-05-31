@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function SearchFallback({ onLocationFound }) {
+export default function SearchFallback({ onLocationFound, onUseGPS }) {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -15,8 +15,9 @@ export default function SearchFallback({ onLocationFound }) {
     setError(null)
 
     try {
+      const searchUrl = `/nominatim/search?q=${encodeURIComponent(trimmedQuery)}&format=json&addressdetails=1&limit=1`
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(trimmedQuery)}&format=json&addressdetails=1&limit=1`,
+        searchUrl,
         {
           headers: {
             Accept: 'application/json',
@@ -74,6 +75,13 @@ export default function SearchFallback({ onLocationFound }) {
             className="cursor-pointer rounded-2xl bg-slate-900 px-5 py-3 text-base font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading ? 'Searching...' : 'Find services'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onUseGPS?.()}
+            className="cursor-pointer rounded-2xl border border-slate-200 bg-white px-5 py-3 text-base font-semibold text-slate-900 transition hover:bg-slate-50"
+          >
+            Use GPS
           </button>
         </div>
 

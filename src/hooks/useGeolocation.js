@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react'
 
 function pickDetectedPlaceName(address = {}) {
 	return (
+		address.road ||
+		address.pedestrian ||
+		address.footway ||
+		address.path ||
 		address.locality ||
 		address.neighbourhood ||
 		address.suburb ||
@@ -16,9 +20,32 @@ function pickDetectedPlaceName(address = {}) {
 	)
 }
 
+async function snapToNearestRoad(lat, lng, signal) {
+	const response = await fetch(`/osrm/nearest/v1/driving/${lng},${lat}?number=1`, {
+		signal,
+		headers: {
+			Accept: 'application/json',
+		},
+	})
+
+	if (!response.ok) return null
+
+	const payload = await response.json()
+	const waypoint = Array.isArray(payload?.waypoints) ? payload.waypoints[0] : null
+	const location = Array.isArray(waypoint?.location) ? waypoint.location : null
+
+	if (!location || location.length < 2) return null
+
+	return {
+		lat: Number(location[1]),
+		lng: Number(location[0]),
+		roadName: typeof waypoint?.name === 'string' && waypoint.name.trim() ? waypoint.name.trim() : null,
+	}
+}
+
 async function reverseGeocodeLocation(lat, lng, signal) {
 	const response = await fetch(
-		`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
+		`/nominatim/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
 		{
 			signal,
 			headers: {
@@ -57,28 +84,50 @@ export default function useGeolocation() {
 			async (position) => {
 				if (cancelled) return
 
-				const nextLat = position.coords.latitude
-				const nextLng = position.coords.longitude
+				const rawLat = position.coords.latitude
+				const rawLng = position.coords.longitude
+				let nextLat = rawLat
+				let nextLng = rawLng
+				let snappedRoadName = null
+
+				try {
+					const snappedLocation = await snapToNearestRoad(rawLat, rawLng, controller.signal)
+					if (snappedLocation) {
+						nextLat = snappedLocation.lat
+						nextLng = snappedLocation.lng
+						snappedRoadName = snappedLocation.roadName
+					}
+				} catch {
+					// Snapping is best-effort; continue with raw coordinates.
+				}
 
 				setLat(nextLat)
 				setLng(nextLng)
+				setError(null)
 
 				try {
 					const detectedLocation = await reverseGeocodeLocation(nextLat, nextLng, controller.signal)
 					if (!cancelled && detectedLocation) {
-						const detectedCountryCode = detectedLocation.address?.country_code ?? null
+						const detectedCountryCode = detectedLocation.address?.country_code ?? detectedLocation?.country_code ?? null
 						const detectedPlaceName = pickDetectedPlaceName(detectedLocation.address)
 
 						if (detectedCountryCode) {
-							setCountryCode(detectedCountryCode)
+							setCountryCode(String(detectedCountryCode).toLowerCase())
 						}
 
 						if (detectedPlaceName) {
 							setPlaceName(detectedPlaceName)
+						} else if (snappedRoadName) {
+							setPlaceName(snappedRoadName)
 						}
+					} else if (!cancelled && snappedRoadName) {
+						setPlaceName(snappedRoadName)
 					}
 				} catch {
 					// Country lookup is best-effort; keep location usable if it fails.
+					if (!cancelled && snappedRoadName) {
+						setPlaceName(snappedRoadName)
+					}
 				} finally {
 					if (!cancelled) setLoading(false)
 				}

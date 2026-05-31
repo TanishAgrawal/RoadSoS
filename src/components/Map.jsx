@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet'
+import { buildGoogleMapsSearchUrl } from '../utils/maps.js'
+import { capitalizeWords, cleanTel, formatDistance } from '../utils/formatting.js'
 
 const CATEGORIES = [
   { value: 'hospital', label: 'Hospitals' },
+  { value: 'fire', label: 'Fire Brigade' },
   { value: 'police', label: 'Police' },
   { value: 'ambulance', label: 'Ambulance' },
   { value: 'towing', label: 'Towing' },
@@ -28,21 +31,6 @@ function createMarkerIcon(color) {
     iconAnchor: [9, 18],
     popupAnchor: [0, -18],
   })
-}
-
-function getServiceColor(type) {
-  if (type === 'police') return '#2563eb'
-  if (type === 'hospital' || type === 'ambulance') return '#dc2626'
-  return '#f97316'
-}
-
-function formatDistance(distance) {
-  if (typeof distance !== 'number' || Number.isNaN(distance)) return 'Distance unavailable'
-  return `${distance.toFixed(1)} km away`
-}
-
-function buildMapsLink(lat, lng) {
-  return `https://maps.google.com/?q=${lat},${lng}`
 }
 
 function getServiceKey(service) {
@@ -87,11 +75,9 @@ export default function Map({
   focusedServiceId = null,
   onCategoryChange,
   onBack,
-  onChangeLocation,
 }) {
   const center = typeof lat === 'number' && typeof lng === 'number' ? [lat, lng] : [0, 0]
   const [panelOpen, setPanelOpen] = useState(true)
-  const [selectedServiceId, setSelectedServiceId] = useState(focusedServiceId)
   const [focusTarget, setFocusTarget] = useState(null)
   const [focusRevision, setFocusRevision] = useState(0)
   const [showCenterPopup, setShowCenterPopup] = useState(false)
@@ -99,8 +85,10 @@ export default function Map({
   const markerRefs = useRef({})
   const recenterButtonRef = useRef(null)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+  const [phoneMenuOpenKey, setPhoneMenuOpenKey] = useState(null)
+  const [phoneMenuNumbers, setPhoneMenuNumbers] = useState(null)
+  const [callNotice, setCallNotice] = useState('')
   const recenterMap = () => {
-    setSelectedServiceId(null)
     setFocusTarget({ type: 'center', key: null })
     setShowCenterPopup(true)
     setFocusRevision((value) => value + 1)
@@ -125,30 +113,27 @@ export default function Map({
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const filteredServices = useMemo(
-    () => services.filter((service) => service.type === activeCategory),
-    [services, activeCategory]
-  )
+  useEffect(() => {
+    if (!callNotice) return undefined
+    const t = setTimeout(() => setCallNotice(''), 2200)
+    return () => clearTimeout(t)
+  }, [callNotice])
+
+  const filteredServices = useMemo(() => {
+    return (services || [])
+      .filter((service) => service.type === activeCategory)
+      .slice()
+      .sort((a, b) => (Number(a.distance ?? Infinity) - Number(b.distance ?? Infinity)))
+  }, [services, activeCategory])
 
   const focusService = (service) => {
     const key = getServiceKey(service)
-    setSelectedServiceId(key)
     setShowCenterPopup(false)
     setFocusTarget({ type: 'service', key })
     setFocusRevision((value) => value + 1)
   }
 
-  useEffect(() => {
-    setSelectedServiceId(focusedServiceId)
-    if (focusedServiceId) {
-      setShowCenterPopup(false)
-      setFocusTarget({ type: 'service', key: focusedServiceId })
-      setFocusRevision((value) => value + 1)
-    } else {
-      setShowCenterPopup(false)
-      setFocusTarget(null)
-    }
-  }, [focusedServiceId, activeCategory])
+  const selectedServiceId = focusTarget?.type === 'service' ? focusTarget.key : focusedServiceId
 
   if (typeof lat !== 'number' || typeof lng !== 'number') return null
 
@@ -235,7 +220,7 @@ export default function Map({
             <Marker
               key={key}
               position={[service.lat, service.lng]}
-              icon={createMarkerIcon(getServiceColor(service.type))}
+              icon={createMarkerIcon('#dc2626')}
               ref={(markerRef) => {
                 markerRefs.current[key] = markerRef
               }}
@@ -245,8 +230,8 @@ export default function Map({
             >
               <Popup>
                 <div className="space-y-2">
-                  <div className="font-semibold text-slate-900">{service.name}</div>
-                  <div className="text-sm text-slate-600">{formatDistance(service.distance)}</div>
+                  <div className="font-semibold text-slate-900">{service.name ? capitalizeWords(service.name) : ''}</div>
+                    <div className="text-sm text-slate-600">{formatDistance(service.distance)}</div>
                 </div>
               </Popup>
             </Marker>
@@ -294,28 +279,51 @@ export default function Map({
                 filteredServices.map((service) => {
                   const key = getServiceKey(service)
                   return (
-                    <button
+                    <div
                       key={key}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => focusService(service)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          focusService(service)
+                        }
+                      }}
                       className={`w-full cursor-pointer rounded-xl border p-3 text-left transition ${
                         selectedServiceId === key
                           ? 'border-blue-400 bg-blue-500/15 ring-1 ring-blue-400/70'
                           : 'border-white/10 bg-white/5 hover:bg-white/10'
                       }`}
                     >
-                      <p className="truncate text-sm font-semibold text-white">{service.name}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="truncate text-sm font-semibold text-white">{service.name ? capitalizeWords(service.name) : ''}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-white/60">{service.address ? capitalizeWords(service.address) : 'No address'}</p>
                       <p className="mt-1 text-xs text-white/70">{formatDistance(service.distance)}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        <a
-                          href={`tel:${service.phone || ''}`}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-900"
-                          onClick={(event) => event.stopPropagation()}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            const rawPhones = service.phones || (service.phone ? [service.phone] : [])
+                            const phones = rawPhones.map(cleanTel).filter(Boolean)
+                            if (phones.length > 1) {
+                              setPhoneMenuNumbers(phones)
+                              setPhoneMenuOpenKey(key)
+                            } else if (phones[0]) {
+                              window.location.href = `tel:${phones[0]}`
+                            } else {
+                              setCallNotice('No valid phone number available')
+                            }
+                          }}
+                          className="cursor-pointer rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-900"
                         >
                           Call
-                        </a>
+                        </button>
+                        {/* phone numbers shown in a modal when present */}
                         <a
-                          href={buildMapsLink(service.lat, service.lng)}
+                          href={buildGoogleMapsSearchUrl(service, 'road service')}
                           target="_blank"
                           rel="noreferrer"
                           className="rounded-full bg-blue-500 px-3 py-1 text-xs font-semibold text-white"
@@ -324,7 +332,7 @@ export default function Map({
                           Directions
                         </a>
                       </div>
-                    </button>
+                    </div>
                   )
                 })
               ) : (
@@ -336,6 +344,33 @@ export default function Map({
           </div>
         )}
       </div>
+
+      {phoneMenuNumbers && phoneMenuOpenKey ? (
+        <div onClick={() => { setPhoneMenuOpenKey(null); setPhoneMenuNumbers(null); }} className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-xl bg-white p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-lg font-bold text-slate-900">Phone numbers</h4>
+              <button
+                onClick={() => { setPhoneMenuOpenKey(null); setPhoneMenuNumbers(null); }}
+                className="rounded-full bg-red-600 px-3 py-1 text-sm font-semibold text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-200"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 flex flex-col gap-2">
+              {phoneMenuNumbers.map((num, idx) => (
+                <a key={idx} href={`tel:${num}`} onClick={() => { setPhoneMenuOpenKey(null); setPhoneMenuNumbers(null); }} className="inline-block rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-900">{num}</a>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {callNotice ? (
+        <div className="fixed bottom-6 left-1/2 z-[9999] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-center text-sm font-semibold text-white shadow-xl">
+          {callNotice}
+        </div>
+      ) : null}
 
       <style>{`
         @media (max-width: 767px) {
