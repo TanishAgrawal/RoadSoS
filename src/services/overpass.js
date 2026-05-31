@@ -1,4 +1,4 @@
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter'
+const OVERPASS_ENDPOINT = 'https://overpass.kumi.systems/api/interpreter'
 const OVERPASS_TIMEOUT_MS = 45000
 const SEARCH_RADIUS_METERS = 10000
 
