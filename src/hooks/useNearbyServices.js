@@ -1,14 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { getDistanceKm } from '../utils/haversine.js'
 import { loadServices, saveServices, isCacheClose } from '../services/offlineCache.js'
 import {
-	fetchAmbulanceStations,
-	fetchCarShowrooms,
-	fetchHospitals,
-	fetchPoliceStations,
-	fetchPunctureShops,
-	fetchTowingServices,
-	fetchFireStations,
+	fetchNearbyServices,
 } from '../services/overpass.js'
 import { classifyHospital } from '../services/hospitalTierSystem.js'
 
@@ -96,26 +90,13 @@ function mergeServices(cachedServices, liveServices) {
 	return [...byKey.values()]
 }
 
-async function fetchAllServices(lat, lng) {
-	const results = await Promise.all([
-		fetchHospitals(lat, lng),
-		fetchPoliceStations(lat, lng),
-		fetchAmbulanceStations(lat, lng),
-		fetchTowingServices(lat, lng),
-		fetchPunctureShops(lat, lng),
-		fetchCarShowrooms(lat, lng),
-		fetchFireStations(lat, lng),
-	])
-
-	return results.flat()
-}
-
 const CACHE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
 
 export default function useNearbyServices({ lat, lng, reloadToken } = {}) {
 	const [services, setServices] = useState([])
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState(null)
+	const fetchingRef = useRef(false)
 
 	useEffect(() => {
 		let cancelled = false
@@ -144,12 +125,20 @@ export default function useNearbyServices({ lat, lng, reloadToken } = {}) {
 			}
 
 			setError(null)
+
+			// If a fetch is already in progress, skip starting another one.
+			if (fetchingRef.current) {
+				return
+			}
+
 			if (!silent) {
 				setLoading(true)
 			}
 
+			fetchingRef.current = true
+
 			try {
-				const fetchedServices = normalizeServices(await fetchAllServices(lat, lng))
+				const fetchedServices = normalizeServices(await fetchNearbyServices(lat, lng))
 				if (cancelled) return
 
 				const mergedServices = mergeServices(cachedServices, fetchedServices)
@@ -170,6 +159,7 @@ export default function useNearbyServices({ lat, lng, reloadToken } = {}) {
 					console.warn('[useNearbyServices] fetch failed and no cache available', err)
 				}
 			} finally {
+				fetchingRef.current = false
 				if (!cancelled && !silent) setLoading(false)
 			}
 		}

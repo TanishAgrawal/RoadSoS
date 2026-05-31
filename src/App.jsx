@@ -24,7 +24,6 @@ function App() {
   const { lat, lng, countryCode, placeName, error, loading, refresh } = useGeolocation()
   const [manualLocation, setManualLocation] = useState(null)
   const [showSearch, setShowSearch] = useState(false)
-  const [locationRequesting, setLocationRequesting] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const [activeView, setActiveView] = useState('home')
   const [activeCategory, setActiveCategory] = useState('hospital')
@@ -55,10 +54,10 @@ function App() {
   // Full-page error landing when geolocation or Overpass/service fetch fails
   // If geolocation failed (user denied or unavailable), allow manual search instead of showing an error.
   if (error && !manualLocation) {
-    if (locationRequesting || loading) {
+      if (loading) {
       return <LoadingSpinner message="Locating you..." submessage="Finding your GPS location" />
     }
-    return <SearchFallback onLocationFound={(location) => { setManualLocation(location); setLocationRequesting(false) }} onUseGPS={() => { setManualLocation(null); setShowSearch(false); setLocationRequesting(true); setReloadToken((t) => t + 1); refresh(); }} />
+      return <SearchFallback onLocationFound={(location) => { setManualLocation(location); }} onUseGPS={() => { setManualLocation(null); setShowSearch(false); setReloadToken((t) => t + 1); refresh(); }} />
   }
 
   // If Overpass / services fetch failed, show the full-page error landing with emergency number and retry.
@@ -74,15 +73,15 @@ function App() {
 
   // Show search fallback when user explicitly requests manual search
   if (showSearch) {
-    if (locationRequesting || loading) {
+      if (loading) {
       return <LoadingSpinner message="Locating you..." submessage="Finding your GPS location" />
     }
-    return <SearchFallback onLocationFound={(location) => { setManualLocation(location); setShowSearch(false); setLocationRequesting(false) }} onUseGPS={() => { setManualLocation(null); setShowSearch(false); setLocationRequesting(true); setReloadToken((t) => t + 1); refresh(); }} />
+      return <SearchFallback onLocationFound={(location) => { setManualLocation(location); setShowSearch(false); }} onUseGPS={() => { setManualLocation(null); setShowSearch(false); setReloadToken((t) => t + 1); refresh(); }} />
   }
 
   // Show a locating spinner while GPS is being resolved (initially),
   // then show a services-loading spinner while nearby services are fetched.
-  if ((locationRequesting || loading) && (typeof resolvedLat !== 'number' || typeof resolvedLng !== 'number')) {
+  if (loading && (typeof resolvedLat !== 'number' || typeof resolvedLng !== 'number')) {
     return <LoadingSpinner message="Locating you..." submessage="Finding your GPS location" />
   }
 

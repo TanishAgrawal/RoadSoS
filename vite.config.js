@@ -6,6 +6,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   server: {
     proxy: {
+      '/overpass/api-de': {
+        target: 'https://overpass-api.de',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/overpass\/api-de/, ''),
+      },
       '/nominatim': {
         target: 'https://nominatim.openstreetmap.org',
         changeOrigin: true,

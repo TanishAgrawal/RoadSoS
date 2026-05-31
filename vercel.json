@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/overpass/api-de/api/interpreter",
+      "destination": "https://overpass-api.de/api/interpreter"
+    }
+  ]
+}

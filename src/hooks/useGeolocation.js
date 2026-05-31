@@ -153,6 +153,7 @@ export default function useGeolocation() {
 
 	// Expose a refresh function to re-request the location (used by UI retry)
 	function refresh() {
+		setError(null)
 		setLoading(true)
 		setRefreshIndex((i) => i + 1)
 	}
