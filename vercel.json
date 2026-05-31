@@ -1,1 +1,12 @@
-{}
+{
+  "rewrites": [
+    {
+      "source": "/api/overpass/:path*",
+      "destination": "https://overpass.kumi.systems/api/:path*"
+    },
+    {
+      "source": "/api/nominatim/:path*",
+      "destination": "https://nominatim.openstreetmap.org/:path*"
+    }
+  ]
+}

@@ -90,7 +90,7 @@ function mergeServices(cachedServices, liveServices) {
 	return [...byKey.values()]
 }
 
-const CACHE_REFRESH_INTERVAL_MS = 30 * 60 * 1000
+const CACHE_REFRESH_INTERVAL_MS = 30 * 60 * 10000
 
 export default function useNearbyServices({ lat, lng, reloadToken } = {}) {
 	const [services, setServices] = useState([])
